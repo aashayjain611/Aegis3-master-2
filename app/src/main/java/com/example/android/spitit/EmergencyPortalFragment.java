@@ -81,6 +81,7 @@ public class EmergencyPortalFragment extends MainActivity {
         setSupportActionBar(toolbar);
         getSupportActionBar().setDisplayHomeAsUpEnabled(true);
         getSupportActionBar().setTitle("Emergency Portal");
+        toolbar.inflateMenu(R.menu.blank);
         database = FirebaseDatabase.getInstance();
         mAuth = FirebaseAuth.getInstance();
         mFirebaseStorage = FirebaseStorage.getInstance();

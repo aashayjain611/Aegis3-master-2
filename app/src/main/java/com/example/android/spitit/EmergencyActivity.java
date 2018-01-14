@@ -11,7 +11,6 @@ import android.support.annotation.NonNull;
 import android.support.annotation.Nullable;
 import android.support.v4.app.ActivityCompat;
 import android.support.v4.content.ContextCompat;
-import android.support.v7.app.AppCompatActivity;
 import android.support.v7.widget.LinearLayoutManager;
 import android.support.v7.widget.RecyclerView;
 import android.support.v7.widget.Toolbar;
@@ -31,10 +30,14 @@ import com.google.android.gms.location.GeofencingRequest;
 import com.google.android.gms.location.LocationServices;
 import com.google.android.gms.maps.model.LatLng;
 import com.google.firebase.auth.FirebaseAuth;
+import com.google.firebase.database.DataSnapshot;
+import com.google.firebase.database.DatabaseError;
 import com.google.firebase.database.DatabaseReference;
 import com.google.firebase.database.FirebaseDatabase;
+import com.google.firebase.database.ValueEventListener;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -42,29 +45,28 @@ public class EmergencyActivity extends MainActivity {
 
     private RecyclerView mEmergencyList;
     private DatabaseReference mDatabase;
-    View myView;
     private FirebaseAuth mAuth;
     private static final int REQUEST_CHECK_SETTINGS_GPS = 2;
     private static final int REQUEST_ID_MULTIPLE_PERMISSIONS = 10;
     private ArrayList<Geofence> mGeofenceList=new ArrayList<>();
     private GoogleApiClient mGoogleApiClient;
     Button endEmergency;
-    Button unsafe;
-    Button safe, emergencyPortal;
-    private android.support.v4.app.FragmentManager fragmentManager;
+    Button emergencyPortal;
+    private Button unsafe;
+    private ArrayList<String> admins=new ArrayList<>();
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_emergency);
 
+        mAuth=FirebaseAuth.getInstance();
         endEmergency = (Button)findViewById(R.id.end_emergency);
-        unsafe = (Button)findViewById(R.id.unsafe);
-        safe = (Button)findViewById(R.id.safe);
         emergencyPortal = (Button)findViewById(R.id.emergencyPortal);
+        unsafe=(Button)findViewById(R.id.unsafe);
 
         checkPermissions();
-        mAuth = FirebaseAuth.getInstance();
+        admins=getAdmin();
         Toolbar toolbar=(Toolbar)findViewById(R.id.emergency_activity_toolbar);
         setSupportActionBar(toolbar);
         getSupportActionBar().setTitle("Emergency");
@@ -93,18 +95,6 @@ public class EmergencyActivity extends MainActivity {
                 .addApi(LocationServices.API)
                 .build();
         populateGeofenceList();
-
-        if(admins.contains(mAuth.getCurrentUser().getEmail()))
-        {
-            endEmergency.setVisibility(View.GONE);
-            emergencyPortal.setVisibility(View.GONE);
-        }
-        else
-        {
-            unsafe.setVisibility(View.GONE);
-            safe.setVisibility(View.GONE);
-        }
-
         endEmergency.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
@@ -131,26 +121,44 @@ public class EmergencyActivity extends MainActivity {
             }
         });
 
-        unsafe.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View view) {
-                startActivity(new Intent(EmergencyActivity.this,EmergencyPortalFragment.class));
-            }
-        });
-
-        safe.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View view) {
-                Toast.makeText(EmergencyActivity.this,"Please help the people stuck",Toast.LENGTH_SHORT).show();
-            }
-        });
-
         emergencyPortal.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
                 startActivity(new Intent(EmergencyActivity.this,EmergencyPortalFragment.class));
             }
         });
+        if(admins.contains(mAuth.getCurrentUser().getEmail()))
+        {
+            endEmergency.setVisibility(View.GONE);
+            emergencyPortal.setVisibility(View.GONE);
+            unsafe.setVisibility(View.GONE);
+        }
+    }
+
+    private ArrayList<String> getAdmin()
+    {
+        final ArrayList<String> admins=new ArrayList<>();
+        DatabaseReference mDatabase= FirebaseDatabase.getInstance().getReference().child("Admin");
+        mDatabase.addValueEventListener(new ValueEventListener() {
+            @Override
+            public void onDataChange(DataSnapshot dataSnapshot) {
+                Log.e("Adminfbfa",dataSnapshot.getValue().toString());
+                HashMap<String,String> admin=(HashMap<String,String>)dataSnapshot.getValue();
+                ArrayList<String> keySet=new ArrayList<>(admin.keySet());
+                for(String key:keySet)
+                {
+                    admins.add(admin.get(key));
+                    Log.e("Adminefbwe",admin.get(key));
+                }
+                Log.e("Arey admins",admins.toString());
+            }
+
+            @Override
+            public void onCancelled(DatabaseError databaseError) {
+
+            }
+        });
+        return admins;
     }
 
     @Override
@@ -159,12 +167,14 @@ public class EmergencyActivity extends MainActivity {
         if (!mGoogleApiClient.isConnecting() || !mGoogleApiClient.isConnected()) {
             mGoogleApiClient.connect();
         }
+        final String[] Uid = new String[1];
         FirebaseRecyclerAdapter<Emergency,EmergencyViewHolder> firebaseRecyclerAdapter=new FirebaseRecyclerAdapter<Emergency, EmergencyViewHolder>(Emergency.class,R.layout.emergency_row,EmergencyViewHolder.class,mDatabase) {
 
 
             @Override
             protected void populateViewHolder(EmergencyViewHolder viewHolder, Emergency model, int position) {
                 final String uid=getRef(position).getKey();
+                Uid[0] =uid;
                 viewHolder.setLocation(model.getLocation());
                 viewHolder.setType(model.getType());
                 viewHolder.setTip(model.getTip());
@@ -172,11 +182,39 @@ public class EmergencyActivity extends MainActivity {
                 viewHolder.mView.setOnClickListener(new View.OnClickListener() {
                     @Override
                     public void onClick(View view) {
-
+                        new AlertDialog.Builder(EmergencyActivity.this)
+                                .setMessage("Are you safe or unsafe ?")
+                                .setCancelable(false)
+                                .setPositiveButton("Unsafe", new DialogInterface.OnClickListener() {
+                                    @Override
+                                    public void onClick(DialogInterface dialogInterface, int i) {
+                                        DatabaseReference databaseReference=FirebaseDatabase.getInstance().getReference().child("Emergency").child(uid).child("People_list").child(mAuth.getCurrentUser().getUid());
+                                        databaseReference.setValue("Unsafe");
+                                        startActivity(new Intent(EmergencyActivity.this,EmergencyPortalFragment.class));
+                                        finish();
+                                    }
+                                })
+                                .setNegativeButton("Safe", new DialogInterface.OnClickListener() {
+                                    @Override
+                                    public void onClick(DialogInterface dialogInterface, int i) {
+                                        DatabaseReference databaseReference=FirebaseDatabase.getInstance().getReference().child("Emergency").child(uid).child("People_list").child(mAuth.getCurrentUser().getUid());
+                                        databaseReference.setValue("Safe");
+                                    }
+                                })
+                                .show();
                     }
                 });
             }
         };
+        unsafe.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View view) {
+                Intent intent=new Intent(EmergencyActivity.this,UnsafeActivity.class);
+                intent.putExtra("UID",Uid[0]);
+                startActivity(intent);
+                finish();
+            }
+        });
         mEmergencyList.setAdapter(firebaseRecyclerAdapter);
     }
 

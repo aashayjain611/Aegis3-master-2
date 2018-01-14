@@ -97,12 +97,26 @@ public class MainActivity extends AppCompatActivity
                 mDatabase.addValueEventListener(new ValueEventListener() {
                     @Override
                     public void onDataChange(DataSnapshot dataSnapshot) {
-                        contacts.add(dataSnapshot.child("Person1").child("Phone").getValue().toString());
-                        contacts.add(dataSnapshot.child("Person2").child("Phone").getValue().toString());
-                        contacts.add(dataSnapshot.child("Person3").child("Phone").getValue().toString());
-                        requestSmsPermission();
-                        Snackbar.make(view, "Message sent successfully", Snackbar.LENGTH_LONG).setAction("Action", null).show();
-
+                        if (dataSnapshot.hasChildren())
+                        {
+                            contacts.add(dataSnapshot.child("Person1").child("Phone").getValue().toString());
+                            contacts.add(dataSnapshot.child("Person2").child("Phone").getValue().toString());
+                            contacts.add(dataSnapshot.child("Person3").child("Phone").getValue().toString());
+                            final AlertDialog dialog=new AlertDialog.Builder(MainActivity.this)
+                                    .setMessage("Are you sure you want to send message?")
+                                    .setCancelable(false)
+                                    .setPositiveButton("Yes", new DialogInterface.OnClickListener() {
+                                        public void onClick(DialogInterface dialog, int id) {
+                                            dialog.dismiss();
+                                            requestSmsPermission();
+                                            Snackbar.make(view, "Message sent successfully", Snackbar.LENGTH_LONG).setAction("Action", null).show();
+                                        }
+                                    })
+                                    .setNegativeButton("No", null)
+                                    .show();
+                        }
+                        else
+                            Toast.makeText(MainActivity.this,"Add emergency contact first!",Toast.LENGTH_LONG).show();
                     }
 
                     @Override
@@ -135,12 +149,6 @@ public class MainActivity extends AppCompatActivity
                 nav_user.setText(acct.getEmail());
         }
         admins=getAdmin();
-        if(admins.contains(mAuth.getCurrentUser().getEmail()));
-        {
-            navigationView = (NavigationView) findViewById(R.id.nav_view);
-            Menu nav_Menu = navigationView.getMenu();
-            nav_Menu.findItem(R.id.nav_emergency).setVisible(true);
-        }
     }
 
     private ArrayList<String> getAdmin()
@@ -241,7 +249,7 @@ public class MainActivity extends AppCompatActivity
                         catch (IllegalArgumentException iae)
                         {
                             startActivity(new Intent(MainActivity.this,EmergencyActivity.class));
-                            Toast.makeText(MainActivity.this,"Emergency already declared",Toast.LENGTH_LONG).show();
+                            Toast.makeText(MainActivity.this,"Emergency declared",Toast.LENGTH_LONG).show();
                         }
                     }
 
@@ -303,11 +311,12 @@ public class MainActivity extends AppCompatActivity
         if (drawer.isDrawerOpen(GravityCompat.START)) {
             drawer.closeDrawer(GravityCompat.START);
         } else {
-            new AlertDialog.Builder(this)
+            AlertDialog dialog=new AlertDialog.Builder(this)
                     .setMessage("Are you sure you want to exit?")
                     .setCancelable(false)
                     .setPositiveButton("Yes", new DialogInterface.OnClickListener() {
                         public void onClick(DialogInterface dialog, int id) {
+                            dialog.dismiss();
                             finish();
                         }
                     })
@@ -328,8 +337,9 @@ public class MainActivity extends AppCompatActivity
             // permission already granted run sms send
             for(String number:contacts)
             {
+                Log.e("Location",mLocation);
                 SmsManager smsManager = SmsManager.getDefault();
-                smsManager.sendTextMessage(number, null, "Help me please", null, null);
+                smsManager.sendTextMessage(number, null, "Help me please\n"+mLocation, null, null);
                 Toast.makeText(getApplicationContext(), "Message Sent",
                         Toast.LENGTH_LONG).show();
             }
