@@ -19,6 +19,7 @@
     <string name="lbltext">"Text : "</string>
     <string name="notification">Notification</string>
     <string name="customnotification">Custom Notification</string>
+    <string name="default_notification_channel_id">Aegis</string>
 
     <string-array name="gender">
 
